@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 const getCookie = (name) => {
   const value = `; ${document.cookie}`;
@@ -26,9 +26,7 @@ const Todo = () => {
 
   useEffect(() => {
     const savedTheme = getCookie("darkMode");
-    if (savedTheme === "true") {
-      setMode(true);
-    }
+    if (savedTheme === "true") setMode(true);
     getTodos();
   }, []);
 
@@ -42,6 +40,7 @@ const Todo = () => {
     id: t.todo_id,
     text: t.description,
     priority: t.priority || "Low",
+    completed: t.completed || false,
   });
 
   const getTodos = async () => {
@@ -61,7 +60,7 @@ const Todo = () => {
     e.preventDefault();
     if (!input.trim()) return;
     try {
-      const body = { description: input, priority: priority };
+      const body = { description: input, priority: priority, completed: false };
       const response = await fetch("http://localhost:5000/todos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -80,6 +79,32 @@ const Todo = () => {
     }
   };
 
+  const updateTodo = async (id, updates) => {
+    try {
+      const currentTask = item.find((t) => t.id === id);
+      const body = {
+        description: updates.text ?? currentTask.text,
+        priority: updates.priority ?? currentTask.priority,
+        completed: updates.completed ?? currentTask.completed,
+      };
+
+      const response = await fetch(`http://localhost:5000/todos/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (response.ok) {
+        setItem((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+        );
+        setEditingId(null);
+      }
+    } catch (err) {
+      console.error(err.message);
+    }
+  };
+
   const removeItem = async (id) => {
     try {
       const response = await fetch(`http://localhost:5000/todos/${id}`, {
@@ -89,36 +114,6 @@ const Todo = () => {
     } catch (err) {
       console.error(err.message);
     }
-  };
-
-  const updateTodo = async (id, newText, newPriority) => {
-    if (!newText.trim()) {
-      setEditingId(null);
-      return;
-    }
-    try {
-      const body = { description: newText, priority: newPriority };
-      const response = await fetch(`http://localhost:5000/todos/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (response.ok) {
-        setItem((prev) =>
-          prev.map((t) =>
-            t.id === id ? { ...t, text: newText, priority: newPriority } : t,
-          ),
-        );
-        setEditingId(null);
-      }
-    } catch (err) {
-      console.error(err.message);
-    }
-  };
-
-  const startEditing = (t) => {
-    setEditingId(t.id);
-    setEditText(t.text);
   };
 
   const getPriorityStyles = (p) => {
@@ -131,10 +126,14 @@ const Todo = () => {
     return styles[p] || styles.Low;
   };
 
-  const sortedItems = [...item].sort(
-    (a, b) =>
-      (priorityWeight[a.priority] || 3) - (priorityWeight[b.priority] || 3),
-  );
+  const sortedItems = useMemo(() => {
+    return [...item].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return (
+        (priorityWeight[a.priority] || 3) - (priorityWeight[b.priority] || 3)
+      );
+    });
+  }, [item]);
 
   return (
     <div
@@ -217,40 +216,59 @@ const Todo = () => {
             sortedItems.map((t) => (
               <div
                 key={t.id}
-                className={`p-4 border-l-4 rounded shadow-sm flex justify-between items-center bg-white dark:bg-gray-800 ${getPriorityStyles(t.priority)}`}
+                className={`p-4 border-l-4 rounded shadow-sm flex justify-between items-center bg-white dark:bg-gray-800 transition-all 
+                  ${t.completed ? "opacity-60 grayscale-[0.5]" : getPriorityStyles(t.priority)}`}
               >
-                {editingId === t.id ? (
+                <div className="flex items-center grow gap-4">
                   <input
-                    autoFocus
-                    className="grow mr-4 p-1 border rounded dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    onBlur={() => setEditingId(null)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter")
-                        updateTodo(t.id, editText, t.priority);
-                      if (e.key === "Escape") setEditingId(null);
-                    }}
+                    type="checkbox"
+                    checked={t.completed}
+                    onChange={() =>
+                      updateTodo(t.id, { completed: !t.completed })
+                    }
+                    className="w-5 h-5 cursor-pointer accent-blue-600"
                   />
-                ) : (
-                  <span
-                    className="font-medium dark:text-white grow cursor-pointer hover:opacity-70 transition-opacity"
-                    onClick={() => startEditing(t)}
-                  >
-                    {t.text}
-                  </span>
-                )}
-
+                  {editingId === t.id ? (
+                    <input
+                      autoFocus
+                      className="grow p-1 border rounded dark:bg-gray-700 dark:text-white outline-none focus:ring-2 focus:ring-blue-500"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onBlur={() => setEditingId(null)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter")
+                          updateTodo(t.id, { text: editText });
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                    />
+                  ) : (
+                    <span
+                      className={`font-medium dark:text-white grow cursor-pointer ${t.completed ? "line-through text-gray-400" : ""}`}
+                      onClick={() => {
+                        if (!t.completed) {
+                          setEditingId(t.id);
+                          setEditText(t.text);
+                        }
+                      }}
+                    >
+                      {t.text}
+                    </span>
+                  )}
+                </div>
                 <div className="flex gap-3 items-center">
-                  <select
-                    value={t.priority}
-                    onChange={(e) => updateTodo(t.id, t.text, e.target.value)}
-                    className="text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded p-1 dark:text-white"
-                  >
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
+                  {!t.completed && (
+                    <select
+                      value={t.priority}
+                      onChange={(e) =>
+                        updateTodo(t.id, { priority: e.target.value })
+                      }
+                      className="text-xs bg-transparent border border-gray-200 dark:border-gray-600 rounded p-1 dark:text-white"
+                    >
+                      <option value="High">High</option>
+                      <option value="Medium">Medium</option>
+                      <option value="Low">Low</option>
+                    </select>
+                  )}
                   <button
                     onClick={() => removeItem(t.id)}
                     className="text-sm text-red-500 hover:text-red-700"
