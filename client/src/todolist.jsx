@@ -116,6 +116,13 @@ const Todo = () => {
     }
   };
 
+  const clearCompleted = async () => {
+    const completedItems = item.filter((t) => t.completed);
+    for (const task of completedItems) {
+      await removeItem(task.id);
+    }
+  };
+
   const getPriorityStyles = (p) => {
     const styles = {
       High: "border-red-500 text-red-700 dark:text-red-400 dark:border-red-600",
@@ -141,7 +148,17 @@ const Todo = () => {
     >
       <div className="max-w-2xl mx-auto p-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-2xl font-bold dark:text-white">Task Manager</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold dark:text-white">Task Manager</h1>
+            {item.some((t) => t.completed) && (
+              <button
+                onClick={clearCompleted}
+                className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400"
+              >
+                Clear Completed
+              </button>
+            )}
+          </div>
           <button
             onClick={toggleTheme}
             className="p-2 bg-gray-200 dark:bg-gray-700 rounded-full w-10 h-10 flex items-center justify-center"
@@ -153,7 +170,7 @@ const Todo = () => {
                 viewBox="0 0 24 24"
                 strokeWidth={1.5}
                 stroke="currentColor"
-                className="size-6"
+                className="size-6 text-white"
               >
                 <path
                   strokeLinecap="round"
@@ -217,7 +234,7 @@ const Todo = () => {
               <div
                 key={t.id}
                 className={`p-4 border-l-4 rounded shadow-sm flex justify-between items-center bg-white dark:bg-gray-800 transition-all 
-                  ${t.completed ? "opacity-60 grayscale-[0.5]" : getPriorityStyles(t.priority)}`}
+                  ${t.completed ? "opacity-60 grayscale-[0.5] border-gray-400" : getPriorityStyles(t.priority)}`}
               >
                 <div className="flex items-center grow gap-4">
                   <input

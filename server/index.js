@@ -11,9 +11,10 @@ app.post("/todos", async (req, res) => {
     const { description, priority } = req.body;
     if (!description)
       return res.status(400).json({ error: "Description required" });
+
     const newTodo = await pool.query(
-      "INSERT INTO todo (description, priority) VALUES($1, $2) RETURNING *",
-      [description, priority || "Low"],
+      "INSERT INTO todo (description, priority, completed) VALUES($1, $2, $3) RETURNING *",
+      [description, priority || "Low", false],
     );
     res.status(201).json(newTodo.rows[0]);
   } catch (err) {
@@ -24,7 +25,9 @@ app.post("/todos", async (req, res) => {
 
 app.get("/todos", async (req, res) => {
   try {
-    const allTodos = await pool.query("SELECT * FROM todo");
+    const allTodos = await pool.query(
+      "SELECT * FROM todo ORDER BY todo_id ASC",
+    );
     res.json(allTodos.rows);
   } catch (err) {
     console.error(err.message);
@@ -35,12 +38,14 @@ app.get("/todos", async (req, res) => {
 app.put("/todos/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    const { description, priority } = req.body;
-    await pool.query(
-      "UPDATE todo SET description = $1, priority = $2 WHERE todo_id = $3",
-      [description, priority, id],
+    const { description, priority, completed } = req.body;
+
+    const updateTodo = await pool.query(
+      "UPDATE todo SET description = $1, priority = $2, completed = $3 WHERE todo_id = $4 RETURNING *",
+      [description, priority, completed, id],
     );
-    res.json("Todo was updated!");
+
+    res.json(updateTodo.rows[0]);
   } catch (err) {
     console.error(err.message);
     res.status(500).json({ error: "Server Error" });
