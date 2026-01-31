@@ -1,4 +1,5 @@
 Simple Todo List (PERN Stack)
+
 📝A modern, full-stack task management application built with the PERN stack. This project features a clean UI styled with Tailwind CSS, a robust Express backend, and persistent storage using PostgreSQL.
 
 🚀 FeaturesFull CRUD: Create, Read, Update, and Delete todos.Persistent Storage: All tasks are stored in a PostgreSQL database.Modern Styling: Responsive and sleek design using Tailwind CSS.RESTful API: Clean separation between the React frontend and Node/Express backend.
